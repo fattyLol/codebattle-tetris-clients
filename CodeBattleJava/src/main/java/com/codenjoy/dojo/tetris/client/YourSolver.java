@@ -29,9 +29,8 @@ import java.util.List;
 
 import com.codenjoy.dojo.client.AbstractJsonSolver;
 import com.codenjoy.dojo.client.WebSocketRunner;
-import com.codenjoy.dojo.services.Command;
-import com.codenjoy.dojo.services.Dice;
-import com.codenjoy.dojo.services.RandomDice;
+import com.codenjoy.dojo.services.*;
+import com.codenjoy.dojo.tetris.model.Elements;
 
 /**
  * User: your name
@@ -43,6 +42,9 @@ public class YourSolver extends AbstractJsonSolver<Board> {
 
     private Dice dice;
 
+    public YourSolver() {
+    }
+
     public YourSolver(Dice dice) {
         this.dice = dice;
     }
@@ -50,25 +52,129 @@ public class YourSolver extends AbstractJsonSolver<Board> {
     @Override
     public String getAnswer(Board board) {
         List<Command> answerList = getAnswerList(board);
-        List<String> stringList = answerList.stream().map(d -> d.toString()).collect(toList());
+        List<String> stringList = answerList.stream().map(Command::toString).collect(toList());
         return String.join(", ", stringList);
     }
 
     private List<Command> getAnswerList(Board board) {
-        System.out.println(board.getGlass().getAt(board.getCurrentFigurePoint()));
-        List<Command> result = new ArrayList<Command>();
-        result.add(Command.LEFT);
-        result.add(Command.random(dice));
-        result.add(Command.ROTATE_CLOCKWISE_180);
+        // список команд
+        List<Command> result = new ArrayList<>();
+
+        final GlassBoard glass = board.getGlass();
+        final List<Elements> futureFigures = board.getFutureFigures();
+        final List<Point> freeSpace = glass.getFreeSpace();
+        final Elements currentFigureType = board.getCurrentFigureType();
+        System.out.println(freeSpace);
+
+        Point theLeftestPoint = getPointForFigure(glass, currentFigureType);
+        System.out.println("The leftest point is " + theLeftestPoint);
+
+
+        final Point currentFigurePoint = board.getCurrentFigurePoint();
+        int directionDelta = theLeftestPoint.getX() - currentFigurePoint.getX();
+
+        if (directionDelta < 0) {
+            for (int i = 0; i > directionDelta; i--) {
+                result.add(Command.LEFT);
+            }
+        } else {
+            for (int i = 0; i < directionDelta; i++) {
+                result.add(Command.RIGHT);
+            }
+        }
+
+//        if (directionDelta == 0) {
+            for (int i = 0; i < currentFigurePoint.getY(); i++) {
+                result.add(Command.DOWN);
+            }
+//        }
+
 
         return result;
     }
 
+    private Point getPointForFigure(GlassBoard glass, Elements currentFigureType) {
+
+        final List<Point> freeSpace = glass.getFreeSpace();
+
+        Point theLeftestPoint = null;
+
+        for (int i = 0; i < 18; i++) {
+            for (Point point : freeSpace) {
+                if (theLeftestPoint == null
+                        && point.getY() == i
+                        && isApplicable(freeSpace, point, currentFigureType)) {
+                    theLeftestPoint = point;
+                } else if (theLeftestPoint != null
+                        && point.getX() < theLeftestPoint.getX()
+                        && point.getY() == i
+                        && isApplicable(freeSpace, point, currentFigureType)) {
+                    theLeftestPoint = point;
+                }
+            }
+            if (theLeftestPoint != null) {
+                break;
+            }
+        }
+
+        return theLeftestPoint;
+    }
+
+    private boolean isApplicable(List<Point> freeSpace, Point theLeftestPoint, Elements currentFigureType) {
+
+        switch (currentFigureType) {
+            case YELLOW: {
+                Point topLeft = new PointImpl();
+                topLeft.setY(theLeftestPoint.getY() + 1);
+                topLeft.setX(theLeftestPoint.getX());
+
+                Point topRight = new PointImpl();
+                topRight.setY(theLeftestPoint.getY() + 1);
+                topRight.setX(theLeftestPoint.getX() + 1);
+
+                Point bottomRight = new PointImpl();
+                bottomRight.setY(theLeftestPoint.getY());
+                bottomRight.setX(theLeftestPoint.getX() + 1);
+
+                if (freeSpace.contains(topLeft)
+                        && freeSpace.contains(topRight)
+                        && freeSpace.contains(bottomRight)) {
+                    return true;
+                }
+                break;
+            }
+            case BLUE: {
+                Point first = new PointImpl();
+                first.setY(theLeftestPoint.getY() + 3);
+                first.setX(theLeftestPoint.getX());
+
+                Point second = new PointImpl();
+                second.setY(theLeftestPoint.getY() + 2);
+                second.setX(theLeftestPoint.getX());
+
+                Point third = new PointImpl();
+                third.setY(theLeftestPoint.getY() + 1);
+                third.setX(theLeftestPoint.getX());
+
+                if (freeSpace.contains(first)
+                        && freeSpace.contains(second)
+                        && freeSpace.contains(third)) {
+                    return true;
+                }
+                break;
+            }
+        }
+
+
+        return false;
+    }
+
+
     public static void main(String[] args) {
         WebSocketRunner.runClient(
                 // скопируйте сюда адрес из браузера, на который перейдете после регистрации/логина
-                "http://localhost:8080/codenjoy-contest/board/player/ziwpjz46y4z5567k7uup?code=3867579515136108220&gameName=tetris",
-                new YourSolver(new RandomDice()),
+                "http://codebattle2020.westeurope.cloudapp.azure.com/codenjoy-contest/board/player/93pm48ynmdljab4cegh1?code=6366567532785197631&gameName=tetris",
+                new YourSolver(),
                 new Board());
     }
 
